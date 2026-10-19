@@ -4,6 +4,6 @@
   برنامه‌های مرورگری طراحی شده است و امنیت اصلی با RLS در دیتابیس تأمین می‌شود.
 */
 window.APP_CONFIG = {
-  SUPABASE_URL: "YOUR_SUPABASE_URL",
-  SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY"
+  SUPABASE_URL: "https://afinukzpzeneoljewagb.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_b0WgtLSxnVlmJUwCpM4bBg_kVOPZGUM"
 };
