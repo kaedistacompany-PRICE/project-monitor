@@ -329,7 +329,7 @@
     });
 
     if (state.profile.role === "manager") {
-      document.getElementById("new-project").onclick = showProjectModal;
+     document.getElementById("new-project").onclick = () => showProjectModal();
     }
   }
 
