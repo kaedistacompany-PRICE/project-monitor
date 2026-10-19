@@ -358,7 +358,10 @@
       if (isEdit) result = await db.from("projects").update(payload).eq("id", project.id);
       else result = await db.from("projects").insert({ ...payload, created_by: state.profile.id });
       btn.disabled = false;
-      if (result.error) return toast("ذخیره پروژه انجام نشد.", "error");
+      if (result.error) {
+  console.error("Project save error:", result.error);
+  return toast("خطا در ذخیره: " + result.error.message, "error");
+}
       m.remove();
       await loadProjects();
       if (isEdit) await openProject(project.id);
