@@ -360,7 +360,11 @@
       btn.disabled = false;
       if (result.error) {
   console.error("Project save error:", result.error);
-  return toast("خطا در ذخیره: " + result.error.message, "error");
+  return toast(
+    "خطا: " + result.error.message +
+    (result.error.details ? " | " + result.error.details : ""),
+    "error"
+  );
 }
       m.remove();
       await loadProjects();
