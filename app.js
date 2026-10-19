@@ -137,7 +137,7 @@
             <div class="brand">ورود به سیستم</div>
             <p class="sub">نام کاربری و رمز عبور خود را وارد کنید.</p>
             <form id="login-form">
-              <div class="field"><label>ایمیل</label><input class="input" id="email" type="email" required autocomplete="username" /></div>
+              <div class="field"><label>نام کاربری یا کد ۷ رقمی</label><input class="input" id="identifier" type="text" required autocomplete="username" /></div>
               <div class="field"><label>رمز عبور</label><input class="input" id="password" type="password" required autocomplete="current-password" /></div>
               <button class="btn btn-primary" style="width:100%" type="submit">ورود</button>
             </form>
