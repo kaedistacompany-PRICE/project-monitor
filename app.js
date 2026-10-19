@@ -135,10 +135,16 @@
           </section>
           <section class="login-form">
             <div class="brand">ورود به سیستم</div>
-            <p class="sub">نام کاربری و رمز عبور خود را وارد کنید.</p>
+            <p class="sub">نام کاربری یا کد ۷ رقمی و رمز عبور خود را وارد کنید.</p>
             <form id="login-form">
-              <div class="field"><label>نام کاربری یا کد ۷ رقمی</label><input class="input" id="identifier" type="text" required autocomplete="username" /></div>
-              <div class="field"><label>رمز عبور</label><input class="input" id="password" type="password" required autocomplete="current-password" /></div>
+              <div class="field">
+                <label>نام کاربری یا کد ۷ رقمی</label>
+                <input class="input" id="identifier" type="text" required autocomplete="username" />
+              </div>
+              <div class="field">
+                <label>رمز عبور</label>
+                <input class="input" id="password" type="password" required autocomplete="current-password" />
+              </div>
               <button class="btn btn-primary" style="width:100%" type="submit">ورود</button>
             </form>
           </section>
@@ -148,29 +154,64 @@
     document.getElementById("login-form").addEventListener("submit", login);
   }
 
+  // ورود با نام کاربری یا کد ۷ رقمی
+  // نیازمند انتشار تابع login-by-identifier در Supabase است.
   async function login(e) {
     e.preventDefault();
 
-    const email = document.getElementById("email").value.trim();
+    const identifier = document.getElementById("identifier").value.trim();
     const password = document.getElementById("password").value;
-    const btn = e.submitter;
+    const btn = e.submitter || document.querySelector('#login-form button[type="submit"]');
 
-    btn.disabled = true;
-    btn.textContent = "در حال ورود...";
+    if (!identifier || !password) {
+      toast("نام کاربری یا کد و رمز عبور را وارد کنید.", "error");
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "در حال ورود...";
+    }
 
     try {
-      const { error } = await db.auth.signInWithPassword({ email, password });
-      if (error) showDatabaseError("خطا در ورود", error);
+      const { data, error } = await db.functions.invoke(
+        "login-by-identifier",
+        {
+          body: {
+            identifier,
+            password
+          }
+        }
+      );
+
+      if (error) throw error;
+
+      if (!data || !data.access_token || !data.refresh_token) {
+        throw new Error(
+          data?.error || "اطلاعات ورود از سرور دریافت نشد."
+        );
+      }
+
+      const { error: sessionError } = await db.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token
+      });
+
+      if (sessionError) throw sessionError;
+
     } catch (error) {
-      showDatabaseError("خطا در ارتباط با سامانه", error);
+      showDatabaseError("خطا در ورود", error);
     } finally {
-      btn.disabled = false;
-      btn.textContent = "ورود";
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "ورود";
+      }
     }
   }
 
   async function logout() {
-    await db.auth.signOut();
+    const { error } = await db.auth.signOut();
+    if (error) showDatabaseError("خطا در خروج", error);
   }
 
   async function loadProfile() {
@@ -224,7 +265,10 @@
   }
 
   async function boot() {
-    const { data } = await db.auth.getSession();
+    const { data, error } = await db.auth.getSession();
+
+    if (error) throw error;
+
     state.session = data.session;
 
     if (!state.session) return loginView();
@@ -292,21 +336,28 @@
 
   function dashboardView() {
     const total = state.projects.length;
+
     const today = state.projects.filter(p =>
-      p.updated_at && new Date(p.updated_at).toDateString() === new Date().toDateString()
+      p.updated_at &&
+      new Date(p.updated_at).toDateString() === new Date().toDateString()
     ).length;
 
     const stale2 = state.projects.filter(p =>
-      !p.updated_at || Date.now() - new Date(p.updated_at).getTime() > 2 * 86400000
+      !p.updated_at ||
+      Date.now() - new Date(p.updated_at).getTime() > 2 * 86400000
     ).length;
 
     const stale7 = state.projects.filter(p =>
-      !p.updated_at || Date.now() - new Date(p.updated_at).getTime() > 7 * 86400000
+      !p.updated_at ||
+      Date.now() - new Date(p.updated_at).getTime() > 7 * 86400000
     ).length;
 
     layout(`
       <div class="page-head">
-        <div><h1>داشبورد</h1><p>آخرین وضعیت پروژه‌ها را در یک نگاه ببینید.</p></div>
+        <div>
+          <h1>داشبورد</h1>
+          <p>آخرین وضعیت پروژه‌ها را در یک نگاه ببینید.</p>
+        </div>
         ${state.profile.role === "manager" ? `<button class="btn btn-primary" id="new-project">+ پروژه جدید</button>` : ""}
       </div>
       <div class="stats">
@@ -323,14 +374,19 @@
       </div>`);
 
     const search = document.getElementById("project-search");
+
     search.addEventListener("input", () => {
       state.query = search.value;
       renderTableOnly();
     });
 
     if (state.profile.role === "manager") {
-     document.getElementById("new-project").onclick = () => showProjectModal();
+      document.getElementById("new-project").onclick = () => showProjectModal();
     }
+
+    document.querySelectorAll(".open-project").forEach(btn => {
+      btn.onclick = () => openProject(btn.dataset.id);
+    });
   }
 
   function projectTable() {
@@ -338,8 +394,12 @@
 
     const rows = state.projects.filter(p => {
       if (!q) return true;
+
       return [p.name, p.description, p.assigned?.full_name]
-        .filter(Boolean).join(" ").toLowerCase().includes(q);
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
     });
 
     if (!rows.length) return `<div class="empty">پروژه‌ای پیدا نشد.</div>`;
@@ -383,7 +443,9 @@
     }
 
     const p = state.currentProject;
-    const canUpdate = state.profile.role === "manager" || p.assigned_to === state.profile.id;
+    const canUpdate =
+      state.profile.role === "manager" ||
+      p.assigned_to === state.profile.id;
 
     if (refreshLayout) {
       layout(`
@@ -495,14 +557,12 @@
         return;
       }
 
-      // شناسه کاربر واردشده باید UUID معتبر باشد
       if (!state.profile?.id || !isValidUUID(state.profile.id)) {
         console.error("INVALID MANAGER PROFILE ID:", state.profile?.id);
         toast("شناسه حساب مدیر معتبر نیست. از حساب خارج شوید و دوباره وارد شوید.", "error");
         return;
       }
 
-      // اگر مسئول انتخاب شده، شناسه او باید UUID معتبر باشد
       let assigned_to = null;
 
       if (assignedValue !== "") {
@@ -511,6 +571,7 @@
           toast("شناسه مسئول پروژه معتبر نیست. فهرست کارشناسان را بررسی کنید.", "error");
           return;
         }
+
         assigned_to = assignedValue;
       }
 
@@ -617,7 +678,7 @@
       btn.textContent = "در حال ثبت...";
 
       try {
-        const { data, error } = await db.from("project_updates")
+        const { error } = await db.from("project_updates")
           .insert({
             project_id: p.id,
             user_id: state.profile.id,
@@ -678,6 +739,8 @@
     if (!session) {
       state.profile = null;
       state.projects = [];
+      state.updates = [];
+      state.experts = [];
       state.currentProject = null;
       loginView();
     } else if (!state.profile) {
